@@ -42,6 +42,9 @@ static constexpr uint32_t window_height = 720U;
 
 ID3D12Device* _dev = nullptr;
 IDXGIFactory6* _dxgiFactory = nullptr;
+ID3D12CommandAllocator* _cmdAllocator = nullptr;
+ID3D12CommandList* _cmdList = nullptr;
+ID3D12CommandQueue* _cmdQueue = nullptr;
 IDXGISwapChain4* _swapChain = nullptr;
 
 #ifdef _DEBUG
@@ -96,7 +99,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	if (FAILED(result))
 	{
-		assert(false && "DXGIFacotyr 野初期化失敗");
+		assert(false && "DXGIFactory の初期化失敗");
 		return -1;
 	}
 
@@ -131,7 +134,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	for (auto lv : levels)
 	{
-		if (D3D12CreateDevice(nullptr , lv , IID_PPV_ARGS(&_dev)) == S_OK)
+		if (D3D12CreateDevice(nullptr, lv, IID_PPV_ARGS(&_dev)) == S_OK)
 		{
 			featureLevel = lv;
 			break;	// 生成可能なバージョンが見つかったらループを打ち切り
@@ -140,10 +143,80 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	if (!_dev)
 	{
-		assert(false && "DXGIFacotyr 野初期化失敗");
+		assert(false && "D3D12Device の生成失敗");
 		return -1;
 	}
 
+	result = _dev->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&_cmdAllocator));
+
+	if (FAILED(result))
+	{
+		assert(false && "D3D12CommandAllocator の生成失敗");
+		return -1;
+	}
+
+	result = _dev->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, _cmdAllocator, nullptr, IID_PPV_ARGS(&_cmdList));
+
+	if (FAILED(result))
+	{
+		assert(false && "D3D12CommandList の生成失敗");
+		return -1;
+	}
+
+	D3D12_COMMAND_QUEUE_DESC cmdQueueDesc = {};
+
+	// タイムアウトなし
+	cmdQueueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
+
+	// アダプターを一つしか使わない時は 0 でよい
+	cmdQueueDesc.NodeMask = 0;
+
+	cmdQueueDesc.Priority = D3D12_COMMAND_QUEUE_PRIORITY_NORMAL; // プライオリティは特に指定なし
+
+	// コマンドリストと合わせる
+	cmdQueueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
+	
+	// キュー作成
+	result = _dev->CreateCommandQueue(&cmdQueueDesc , IID_PPV_ARGS(&_cmdQueue));
+
+	if (FAILED(result))
+	{
+		assert(false && "D3D12CommandQueue の生成失敗");
+		return -1;
+	}
+
+	DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
+
+	swapChainDesc.Width = window_width;
+	swapChainDesc.Height = window_height;
+	swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+	swapChainDesc.Stereo = false;
+	swapChainDesc.SampleDesc.Count = 1;
+	swapChainDesc.SampleDesc.Quality = 0;
+	swapChainDesc.BufferUsage = DXGI_USAGE_BACK_BUFFER;
+	swapChainDesc.BufferCount = 2;
+
+	// バックバッファーは伸び縮み可能
+	swapChainDesc.Scaling = DXGI_SCALING_STRETCH;
+
+	// フリップ後は速やかに破棄
+	swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
+
+	// 特に指定なし
+	swapChainDesc.AlphaMode = DXGI_ALPHA_MODE_UNSPECIFIED;
+
+	// ウィンドウ<=>フルスクリーン切り替え可能
+	swapChainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
+
+	result = _dxgiFactory->CreateSwapChainForHwnd(_cmdQueue, hwnd, &swapChainDesc, nullptr, nullptr, (IDXGISwapChain1**)&_swapChain);	// 本来は QueryInterface などを用いて
+																																		// IDXGISwapChain4* への返還チェックをするが、
+																																		// ここではわかりやすさ重視のためキャストで対応
+
+	if (FAILED(result))
+	{
+		assert(false && "IDXGISwapChain4 の生成失敗");
+		return -1;
+	}
 
 	MSG msg = {};
 	while(true)
