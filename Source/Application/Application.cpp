@@ -268,11 +268,12 @@ void Application::Execute()
 
 		ShowWindow(hwnd , SW_SHOW); // ウィンドウ表示
 		
-		DirectX::XMFLOAT3 vertices[3] = 
+		DirectX::XMFLOAT3 vertices[] = 
 		{
-			{ -1.0F, -1.0F, 0.0F },	// 左下
-			{ -1.0F,  1.0F, 0.0F }, // 左上
-			{  1.0F, -1.0F, 0.0F }	// 右下
+			{ -0.4F, -0.7F, 0.0F },	// インデックス : 0
+			{ -0.4F,  0.7F, 0.0F }, // インデックス : 1
+			{  0.4F, -0.7F, 0.0F },	// インデックス : 2
+			{  0.4F,  0.7F, 0.0F }	// インデックス : 3
 		};
 
 		D3D12_HEAP_PROPERTIES heapProp = {};
@@ -328,6 +329,41 @@ void Application::Execute()
 		vbView.BufferLocation = vertBuff->GetGPUVirtualAddress(); // バッファーの仮想アドレス
 		vbView.SizeInBytes    = sizeof(vertices);    // 全バイト数
 		vbView.StrideInBytes  = sizeof(vertices[0]); // 1頂点辺りのバイト数
+
+		unsigned short indices[] = { 0, 1, 2, 2, 1, 3 };
+
+		ComPtr<ID3D12Resource> idxBuff = nullptr;
+
+		// 設定は、バッファーのサイズ以外、頂点バッファーの設定を使いまわしてよい
+		resDesc.Width = sizeof(indices);
+
+		result = _dev->CreateCommittedResource(
+			&heapProp, 
+			D3D12_HEAP_FLAG_NONE,
+			&resDesc,
+			D3D12_RESOURCE_STATE_GENERIC_READ,
+			nullptr,
+			IID_PPV_ARGS(&idxBuff));
+
+		// 作ったバッファーにインデックスデータをコピー
+		unsigned short* mappedIdx = nullptr;
+		result = idxBuff->Map(0, nullptr, (void**)&mappedIdx);
+
+		if (FAILED(result))
+		{
+			assert(false && "インデックスバッファーのマップに失敗");
+			return;
+		}
+
+		std::copy(std::begin(indices), std::end(indices), mappedIdx);
+		idxBuff->Unmap(0, nullptr);
+
+		// インデックスバッファービューの作成
+		D3D12_INDEX_BUFFER_VIEW ibView = {};
+
+		ibView.BufferLocation = idxBuff->GetGPUVirtualAddress();
+		ibView.Format = DXGI_FORMAT_R16_UINT;
+		ibView.SizeInBytes = sizeof(indices);
 
 		ComPtr<ID3DBlob> _vsBlob    = nullptr;
 		ComPtr<ID3DBlob> _psBlob    = nullptr;
@@ -549,8 +585,10 @@ void Application::Execute()
 
 			_cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 			_cmdList->IASetVertexBuffers(0, 1, &vbView);
+			_cmdList->IASetIndexBuffer(&ibView);
 			
-			_cmdList->DrawInstanced(3, 1, 0, 0);
+			//_cmdList->DrawInstanced(44, 1, 0, 0);
+			_cmdList->DrawIndexedInstanced(6, 1, 0, 0, 0);
 
 			// 前後だけ入れ替える
 			BarrierDesc.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
