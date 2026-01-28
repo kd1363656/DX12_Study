@@ -7,6 +7,15 @@
     <Filter Include="Source\Application">
       <UniqueIdentifier>{0a389598-a7f4-4691-a7dc-ba1fe786f65f}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Asset">
+      <UniqueIdentifier>{b613f6ca-75a2-4406-8977-9f7f12064ab6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Asset\Shader">
+      <UniqueIdentifier>{dc27e919-e9a7-4a13-84b6-a50a5fa835f1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Asset\Shader\Basic">
+      <UniqueIdentifier>{4bf392a4-6a79-4363-bf8f-e200ed1d7ce0}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Application\Application.cpp">
@@ -26,5 +35,13 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="Asset\Shader\Basic\BasicVertexShader.hlsl">
+      <Filter>Asset\Shader\Basic</Filter>
+    </FxCompile>
+    <FxCompile Include="Asset\Shader\Basic\BasicPixelShader.hlsl">
+      <Filter>Asset\Shader\Basic</Filter>
+    </FxCompile>
   </ItemGroup>
 </Project>

@@ -12,7 +12,12 @@
 
 #include "wrl/client.h"
 
-#pragma comment(lib,"d3d12.lib")
-#pragma comment(lib,"dxgi.lib")
+#include "DirectXMath.h"
+
+#include "d3dcompiler.h"
+
+#pragma comment(lib, "d3d12.lib")
+#pragma comment(lib, "dxgi.lib")
+#pragma comment(lib, "d3dCompiler.lib")
 
 using Microsoft::WRL::ComPtr;
