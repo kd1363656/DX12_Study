@@ -44,9 +44,8 @@ void Application::Execute()
 		WNDCLASSEX w = {};
 		w.cbSize = sizeof(w);
 		w.lpfnWndProc = (WNDPROC)WindowProcedure; // コールバック関数の指定
-		w.lpszClassName = _T("DX12Sample");	      // アプリケーションクラス名(適当で良い)
+		w.lpszClassName = _T("DX12Test");	      // アプリケーションクラス名(適当で良い)
 		w.hInstance = GetModuleHandle(nullptr);	  // ハンドルの取得
-
 		RegisterClassEx(&w); // アプリケーションクラス(ウィンドウクラスの指定を OS に伝える)
 
 		RECT wrc = { 0, 0, window_width , window_height }; // ウィンドウサイズを決める
@@ -56,7 +55,7 @@ void Application::Execute()
 
 		// ウィンドウオブジェクトの生成
 		HWND hwnd = CreateWindow(w.lpszClassName, // クラス名指定
-			_T("DX12テスト"),		// タイトルバーの文字]
+			_T("DX12 単純ポリゴンテスト"),		// タイトルバーの文字]
 			WS_OVERLAPPEDWINDOW,		// タイトルバーと境界線があるウィンドウ
 			CW_USEDEFAULT,			// 表示X座標は OS にお任せ
 			CW_USEDEFAULT,			// 表示y座標は OS にお任せ
@@ -80,13 +79,7 @@ void Application::Execute()
 			D3D_FEATURE_LEVEL_11_0,
 		};
 
-		HRESULT result = S_OK;
-
-#ifdef _DEBUG
-		result = CreateDXGIFactory2(DXGI_CREATE_FACTORY_DEBUG , IID_PPV_ARGS(&_dxgiFactory));
-#else
-		resutl = CreateDXGIFactory1(IID_PPV_ARGS(&_dxgiFactory));
-#endif
+		auto result = CreateDXGIFactory1(IID_PPV_ARGS(&_dxgiFactory));
 
 		if (FAILED(result))
 		{
@@ -122,7 +115,6 @@ void Application::Execute()
 
 		// Direct3D デバイスの初期化
 		D3D_FEATURE_LEVEL featureLevel;
-
 		for (auto lv : levels)
 		{
 			if (D3D12CreateDevice(tmpAdapter.Get(), lv, IID_PPV_ARGS(&_dev)) == S_OK)
@@ -186,18 +178,10 @@ void Application::Execute()
 		swapChainDesc.SampleDesc.Quality = 0;
 		swapChainDesc.BufferUsage = DXGI_USAGE_BACK_BUFFER;
 		swapChainDesc.BufferCount = 2;
-
-		// バックバッファーは伸び縮み可能
-		swapChainDesc.Scaling = DXGI_SCALING_STRETCH;
-
-		// フリップ後は速やかに破棄
-		swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
-
-		// 特に指定なし
-		swapChainDesc.AlphaMode = DXGI_ALPHA_MODE_UNSPECIFIED;
-
-		// ウィンドウ<=>フルスクリーン切り替え可能
-		swapChainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
+		swapChainDesc.Scaling = DXGI_SCALING_STRETCH; // バックバッファーは伸び縮み可能
+		swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD; // フリップ後は速やかに破棄
+		swapChainDesc.AlphaMode = DXGI_ALPHA_MODE_UNSPECIFIED; // 特に指定なし
+		swapChainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH; // ウィンドウ<=>フルスクリーン切り替え可能
 
 		ComPtr<IDXGISwapChain1> swapChain1;
 		result = _dxgiFactory->CreateSwapChainForHwnd(_cmdQueue.Get(), hwnd, &swapChainDesc, nullptr, nullptr, &swapChain1);	// 本来は QueryInterface などを用いて
@@ -270,10 +254,10 @@ void Application::Execute()
 		
 		DirectX::XMFLOAT3 vertices[] = 
 		{
-			{ -0.4F, -0.7F, 0.0F },	// インデックス : 0
-			{ -0.4F,  0.7F, 0.0F }, // インデックス : 1
-			{  0.4F, -0.7F, 0.0F },	// インデックス : 2
-			{  0.4F,  0.7F, 0.0F }	// インデックス : 3
+			{ -0.4F, -0.7F, 0.0F },	// 左下
+			{ -0.4F,  0.7F, 0.0F }, // 左上
+			{  0.4F, -0.7F, 0.0F },	// 右下
+			{  0.4F,  0.7F, 0.0F }	// 右上
 		};
 
 		D3D12_HEAP_PROPERTIES heapProp = {};
@@ -294,8 +278,8 @@ void Application::Execute()
 		resDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
 		resDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 
+		// UPLOAD ( CPU GPU どちらからもアクセス可能)
 		ComPtr<ID3D12Resource> vertBuff = nullptr;
-
 		result = _dev->CreateCommittedResource(
 			&heapProp, 
 			D3D12_HEAP_FLAG_NONE, 
@@ -311,7 +295,6 @@ void Application::Execute()
 		}
 
 		DirectX::XMFLOAT3* vertMap = nullptr;
-
 		result = vertBuff->Map(0, nullptr, (void**)&vertMap);
 
 		if (FAILED(result))
@@ -325,7 +308,6 @@ void Application::Execute()
 		vertBuff->Unmap(0, nullptr);
 
 		D3D12_VERTEX_BUFFER_VIEW vbView = {};
-
 		vbView.BufferLocation = vertBuff->GetGPUVirtualAddress(); // バッファーの仮想アドレス
 		vbView.SizeInBytes    = sizeof(vertices);    // 全バイト数
 		vbView.StrideInBytes  = sizeof(vertices[0]); // 1頂点辺りのバイト数
@@ -376,7 +358,7 @@ void Application::Execute()
 			"BasicVS", "vs_5_0", // 関数は"BasicVS、対象シェーダーはvs_5_0"
 			D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION,
 			0,
-			_vsBlob.GetAddressOf(), _errorBlob.GetAddressOf());	// エラー時は errorBlob にメッセージが入る
+			&_vsBlob, &_errorBlob);	// エラー時は errorBlob にメッセージが入る
 
 		if (FAILED(result))
 		{
@@ -406,7 +388,7 @@ void Application::Execute()
 			"BasicPS", "ps_5_0", // 関数は"BasicPS、対象シェーダーはps_5_0"
 			D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION,
 			0,
-			_psBlob.GetAddressOf(), _errorBlob.GetAddressOf());	// エラー時は errorBlob にメッセージが入る
+			&_psBlob, &_errorBlob);	// エラー時は errorBlob にメッセージが入る
 
 		if (FAILED(result))
 		{
@@ -455,10 +437,13 @@ void Application::Execute()
 		gpipeline.BlendState.IndependentBlendEnable = false;
 
 		D3D12_RENDER_TARGET_BLEND_DESC renderTargetBlendDesc = {};
+
+		// ひとまず加算や乗算やαブレンディングは使用しない
 		renderTargetBlendDesc.BlendEnable = false;
+		renderTargetBlendDesc.RenderTargetWriteMask =D3D12_COLOR_WRITE_ENABLE_ALL;
+
+		// ひとまず論理演算は使用しない
 		renderTargetBlendDesc.LogicOpEnable = false;
-		renderTargetBlendDesc.RenderTargetWriteMask =
-			D3D12_COLOR_WRITE_ENABLE_ALL;
 
 		gpipeline.BlendState.RenderTarget[0] = renderTargetBlendDesc;
 
@@ -466,6 +451,18 @@ void Application::Execute()
 		gpipeline.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;	// カリングしない
 		gpipeline.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID; // 中身を塗りつぶす
 		gpipeline.RasterizerState.DepthClipEnable = true; // 深度方向のクリッピングは有効
+
+		// 残り
+		gpipeline.RasterizerState.FrontCounterClockwise = false;
+		gpipeline.RasterizerState.DepthBias = D3D12_DEFAULT_DEPTH_BIAS;
+		gpipeline.RasterizerState.DepthBiasClamp = D3D12_DEFAULT_DEPTH_BIAS_CLAMP;
+		gpipeline.RasterizerState.SlopeScaledDepthBias = D3D12_DEFAULT_SLOPE_SCALED_DEPTH_BIAS;
+		gpipeline.RasterizerState.AntialiasedLineEnable = false;
+		gpipeline.RasterizerState.ForcedSampleCount = 0;
+		gpipeline.RasterizerState.ConservativeRaster = D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF;
+
+		gpipeline.DepthStencilState.DepthEnable = false;
+		gpipeline.DepthStencilState.StencilEnable = false;
 
 		gpipeline.InputLayout.pInputElementDescs = inputLayout;    // 入力アセンブラの設定// レイアウト先頭アドレス
 		gpipeline.InputLayout.NumElements = _countof(inputLayout); // レイアウト配列の要素数
@@ -488,7 +485,7 @@ void Application::Execute()
 		ComPtr<ID3DBlob> rootSigBlob = nullptr;
 		result = D3D12SerializeRootSignature(
 			&rootSignatureDesc,	// ルートシグネチャ設定
-			D3D_ROOT_SIGNATURE_VERSION_1, // ルートシグネチャバージョン
+			D3D_ROOT_SIGNATURE_VERSION_1_0, // ルートシグネチャバージョン
 			&rootSigBlob,	// シェーダーを作った時と同じ
 			&_errorBlob);	// エラー処理も同じ
 
@@ -543,6 +540,7 @@ void Application::Execute()
 		scissorrect.bottom = scissorrect.top + window_height; // 切り抜き下座標
 
 		MSG msg = {};
+		unsigned int frame = 0;
 		while(true)
 		{
 			if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
@@ -576,9 +574,13 @@ void Application::Execute()
 			_cmdList->OMSetRenderTargets(1, &rtvH, true, nullptr);
 
 			// 画面クリア
-			float clearColor[] = { 1.0F , 1.0F , 0.0F , 1.0F }; // 黄色
+			float r, g, b;
+			r = (float)(0xff & frame >> 16) / 255.0F;
+			g = (float)(0xff & frame >> 8) / 255.0F;
+			b = (float)(0xff & frame >> 0) / 255.0F;
+			float clearColor[] = { r , g , b , 1.0F }; // 黄色
 			_cmdList->ClearRenderTargetView(rtvH, clearColor, 0, nullptr);
-
+			++frame;
 			_cmdList->RSSetViewports(1, &viewport);
 			_cmdList->RSSetScissorRects(1, &scissorrect);
 			_cmdList->SetGraphicsRootSignature(rootsignature.Get());
@@ -625,8 +627,8 @@ void Application::Execute()
 			_swapChain->Present(1 , 0);
 		}
 
+		// 処理をやめる前に"DX12"との同期を待つ
 		_cmdQueue->Signal(_fence.Get(), ++_fenceVal);
-
 		if (_fence->GetCompletedValue() != _fenceVal)
 		{
 			// イベントハンドルの取得
