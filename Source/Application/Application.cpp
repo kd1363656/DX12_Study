@@ -735,13 +735,13 @@ void Application::Execute()
 			_cmdList->RSSetScissorRects(1, &scissorrect);
 			_cmdList->SetGraphicsRootSignature(rootsignature.Get());
 
-			_cmdList->SetDescriptorHeaps(1, texDescHeap.GetAddressOf());
-			_cmdList->SetGraphicsRootDescriptorTable(0, texDescHeap->GetGPUDescriptorHandleForHeapStart());
-
 			_cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 			_cmdList->IASetVertexBuffers(0, 1, &vbView);
 			_cmdList->IASetIndexBuffer(&ibView);
-			
+
+			_cmdList->SetDescriptorHeaps(1, texDescHeap.GetAddressOf());
+			_cmdList->SetGraphicsRootDescriptorTable(0, texDescHeap->GetGPUDescriptorHandleForHeapStart());
+
 			_cmdList->DrawIndexedInstanced(6, 1, 0, 0, 0);
 
 			// ‘OŒã‚¾‚¯“ü‚ê‘Ö‚¦‚é
