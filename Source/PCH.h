@@ -16,8 +16,11 @@
 
 #include "d3dcompiler.h"
 
+#include "DirectXTex.h"
+
 #pragma comment(lib, "d3d12.lib")
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "d3dCompiler.lib")
+#pragma comment(lib, "DirectXTex.lib")
 
 using Microsoft::WRL::ComPtr;

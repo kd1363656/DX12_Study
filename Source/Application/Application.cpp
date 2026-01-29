@@ -223,8 +223,13 @@ void Application::Execute()
 		}
 
 		std::vector<ComPtr<ID3D12Resource>> _backBuffers(swcDesc.BufferCount);
-
 		D3D12_CPU_DESCRIPTOR_HANDLE handle = rtvHeaps->GetCPUDescriptorHandleForHeapStart();
+
+		// SRGBレンダーターゲットビュー設定
+		D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
+		rtvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+		rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+
 		for (int idx = 0; idx < swcDesc.BufferCount; ++idx)
 		{
 			result = _swapChain->GetBuffer(idx, IID_PPV_ARGS(&_backBuffers[idx]));
@@ -235,7 +240,7 @@ void Application::Execute()
 				return;
 			}
 
-			_dev->CreateRenderTargetView(_backBuffers[idx].Get(), nullptr, handle);
+			_dev->CreateRenderTargetView(_backBuffers[idx].Get(), &rtvDesc, handle);
 
 			handle.ptr += _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 		}
@@ -261,7 +266,7 @@ void Application::Execute()
 		};
 
 		D3D12_HEAP_PROPERTIES heapProp = {};
-
+		
 		heapProp.Type = D3D12_HEAP_TYPE_UPLOAD;
 		heapProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
 		heapProp.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
@@ -479,7 +484,7 @@ void Application::Execute()
 		gpipeline.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE; // 三角形で構成
 
 		gpipeline.NumRenderTargets = 1; // 今は一つのみ
-		gpipeline.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM; // 0 ~ 1 に正規化されたRGBA
+		gpipeline.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB; // 0 ~ 1 に正規化されたRGBA
 
 		gpipeline.SampleDesc.Count = 1;	// マルチサンプルしない
 		gpipeline.SampleDesc.Quality = 0; // クオリティは最低
@@ -510,7 +515,7 @@ void Application::Execute()
 		samplerDesc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP; // 縦方向の繰り返し
 		samplerDesc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP; // 奥行きの繰り返し
 		samplerDesc.BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK; // ボーダーは黒
-		samplerDesc.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR; // 線形補完
+		samplerDesc.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT; // 線形補完
 		samplerDesc.MaxLOD = D3D12_FLOAT32_MAX; // ミップマップ最大値
 		samplerDesc.MinLOD = 0.0F; // ミップマップ最小値
 		samplerDesc.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL; // ピクセルシェーダーから見える
@@ -576,6 +581,22 @@ void Application::Execute()
 		scissorrect.right = scissorrect.left + window_width; // 切り抜き右座標
 		scissorrect.bottom = scissorrect.top + window_height; // 切り抜き下座標
 
+		// WICテクスチャのロード
+		DirectX::TexMetadata metadata = {};
+		DirectX::ScratchImage scratchImg = {};
+
+		result = DirectX::LoadFromWICFile(
+			L"Asset/Texture/Test.png", DirectX::WIC_FLAGS_NONE,
+			&metadata, scratchImg);
+
+		if (FAILED(result))
+		{
+			assert(false && "テクスチャのロードに失敗");
+			return;
+		}
+
+		auto img = scratchImg.GetImage(0, 0, 0); // 生データ抽出
+
 		std::vector<TexRGBA> texturedata(256 * 256);
 
 		for (auto& rgba : texturedata)
@@ -604,14 +625,14 @@ void Application::Execute()
 
 		D3D12_RESOURCE_DESC resDesc = {};
 
-		resDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;	// RGBA フォーマット
-		resDesc.Width = 256; // 幅 256 ピクセル
-		resDesc.Height = 256; // 高さ 
-		resDesc.DepthOrArraySize = 1; // 2D でも配列でもないので 1
+		resDesc.Format = metadata.format;	// RGBA フォーマット
+		resDesc.Width = metadata.width; // 幅 256 ピクセル
+		resDesc.Height = metadata.height; // 高さ 
+		resDesc.DepthOrArraySize = metadata.arraySize; // 2D でも配列でもないので 1
 		resDesc.SampleDesc.Count = 1; // 通常テクスチャなのでアンチエイリアシングしない
 		resDesc.SampleDesc.Quality = 0; // クオリティは最低
-		resDesc.MipLevels = 1; // ミップマップしないのでミップ数は1つ
-		resDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D; // 2D テクスチャ用
+		resDesc.MipLevels = metadata.mipLevels; // ミップマップしないのでミップ数は1つ
+		resDesc.Dimension = static_cast<D3D12_RESOURCE_DIMENSION>(metadata.dimension); // 2D テクスチャ用
 		resDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN; // レイアウトは決定しない
 		resDesc.Flags = D3D12_RESOURCE_FLAG_NONE;      // 特にフラグなし
 
@@ -631,13 +652,12 @@ void Application::Execute()
 			return;
 		}
 
-
 		result = texbuff->WriteToSubresource(
 			0,
-			nullptr, // 全領域へコピー
-			texturedata.data(), // 元データアドレス
-			sizeof(TexRGBA) * 256, // 1ラインサイズ
-			sizeof(TexRGBA) * texturedata.size() // 全サイズ
+			nullptr,        // 全領域へコピー
+			img->pixels,    // 元データアドレス
+			img->rowPitch,  // 1ラインサイズ
+			img->slicePitch // 1枚サイズ
 		);
 
 		if (FAILED(result))
@@ -672,7 +692,7 @@ void Application::Execute()
 
 		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 
-		srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM; // RGBA (0.0F ~ 1.0Fに正規化)
+		srvDesc.Format = metadata.format; // RGBA (0.0F ~ 1.0Fに正規化)
 		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D; // 2Dテクスチャ
 		srvDesc.Texture2D.MipLevels = 1; // ミップマップは使用しないので 1
