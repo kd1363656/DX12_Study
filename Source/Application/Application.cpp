@@ -252,12 +252,12 @@ void Application::Execute()
 
 		ShowWindow(hwnd , SW_SHOW); // ウィンドウ表示
 		
-		DirectX::XMFLOAT3 vertices[] = 
+		Vertex vertices[] = 
 		{
-			{ -0.4F, -0.7F, 0.0F },	// 左下
-			{ -0.4F,  0.7F, 0.0F }, // 左上
-			{  0.4F, -0.7F, 0.0F },	// 右下
-			{  0.4F,  0.7F, 0.0F }	// 右上
+			{ { -0.4F, -0.7F, 0.0F }, { 0.0F, 1.0F} },	// 左下
+			{ { -0.4F,  0.7F, 0.0F }, { 0.0F, 0.0F} },  // 左上
+			{ {  0.4F, -0.7F, 0.0F }, { 1.0F, 1.0F} },	// 右下
+			{ {  0.4F,  0.7F, 0.0F }, { 1.0F, 0.0F} }	// 右上
 		};
 
 		D3D12_HEAP_PROPERTIES heapProp = {};
@@ -294,7 +294,7 @@ void Application::Execute()
 			return;
 		}
 
-		DirectX::XMFLOAT3* vertMap = nullptr;
+		Vertex* vertMap = nullptr;
 		result = vertBuff->Map(0, nullptr, (void**)&vertMap);
 
 		if (FAILED(result))
