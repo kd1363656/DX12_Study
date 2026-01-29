@@ -346,7 +346,6 @@ void Application::Execute()
 
 	// インデックスバッファービューの作成
 	D3D12_INDEX_BUFFER_VIEW ibView = {};
-
 	ibView.BufferLocation = idxBuff->GetGPUVirtualAddress();
 	ibView.Format = DXGI_FORMAT_R16_UINT;
 	ibView.SizeInBytes = sizeof(indices);
@@ -434,9 +433,7 @@ void Application::Execute()
 	};
 
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC gpipeline = {};
-
 	gpipeline.pRootSignature = nullptr;	// 後で設定する
-
 	gpipeline.VS.pShaderBytecode = _vsBlob->GetBufferPointer();
 	gpipeline.VS.BytecodeLength = _vsBlob->GetBufferSize();
 	gpipeline.PS.pShaderBytecode = _psBlob->GetBufferPointer();
@@ -509,7 +506,6 @@ void Application::Execute()
 	rootSignatureDesc.NumParameters = 1;        // ルートパラメータ数
 
 	D3D12_STATIC_SAMPLER_DESC samplerDesc = {};
-
 	samplerDesc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP; // 横方向の繰り返し
 	samplerDesc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP; // 縦方向の繰り返し
 	samplerDesc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP; // 奥行きの繰り返し
@@ -596,31 +592,32 @@ void Application::Execute()
 
 	auto img = scratchImg.GetImage(0, 0, 0); // 生データ抽出
 
-	std::vector<TexRGBA> texturedata(256 * 256);
+	// ノイズテクスチャの作成
+	//std::vector<TexRGBA> texturedata(256 * 256);
 
-	for (auto& rgba : texturedata)
-	{
-		rgba.R = rand() % 256;
-		rgba.G = rand() % 256;
-		rgba.B = rand() % 256;
-		rgba.A = 255; // αは1.0とする
-	}
+	//for (auto& rgba : texturedata)
+	//{
+	//	rgba.R = rand() % 256;
+	//	rgba.G = rand() % 256;
+	//	rgba.B = rand() % 256;
+	//	rgba.A = 255; // αは1.0とする
+	//}
 
 	// WriteToSubresource で転送するためのヒープ設定
-	D3D12_HEAP_PROPERTIES heapprop = {};
+	D3D12_HEAP_PROPERTIES texHeapProp = {};
 
 	// 特殊な設定なので DEFAULT でも UPLOAD でもない
-	heapprop.Type = D3D12_HEAP_TYPE_CUSTOM;
+	texHeapProp.Type = D3D12_HEAP_TYPE_CUSTOM;
 
 	// ライトバック
-	heapprop.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_WRITE_BACK;
+	texHeapProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_WRITE_BACK;
 
 	// 転送は L0、つまり CPU 側から直接行う
-	heapprop.MemoryPoolPreference = D3D12_MEMORY_POOL_L0;
+	texHeapProp.MemoryPoolPreference = D3D12_MEMORY_POOL_L0;
 
 	// 単一アダプターのため 0
-	heapprop.CreationNodeMask = 0;
-	heapprop.VisibleNodeMask  = 0;
+	texHeapProp.CreationNodeMask = 0;
+	texHeapProp.VisibleNodeMask  = 0;
 
 	D3D12_RESOURCE_DESC resDesc = {};
 
@@ -638,7 +635,7 @@ void Application::Execute()
 	ComPtr<ID3D12Resource> texbuff = nullptr;
 
 	result = _dev->CreateCommittedResource(
-		&heapprop,
+		&texHeapProp,
 		D3D12_HEAP_FLAG_NONE,
 		&resDesc,
 		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, // テクスチャ用指定
@@ -667,18 +664,10 @@ void Application::Execute()
 
 	ComPtr<ID3D12DescriptorHeap> texDescHeap = nullptr;
 	D3D12_DESCRIPTOR_HEAP_DESC descHeapDesc = {};
-
-	// シェーダーから見えるように
-	descHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-
-	// マスクは 0
-	descHeapDesc.NodeMask = 0;
-
-	// ビューは今のところ一つだけ
-	descHeapDesc.NumDescriptors = 1;
-
-	// シェーダーリソースビュー用
-	descHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+	descHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE; // シェーダーから見えるように
+	descHeapDesc.NodeMask = 0; // マスクは 0
+	descHeapDesc.NumDescriptors = 1; // ビューは今のところ一つだけ  
+	descHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV; // シェーダーリソースビュー用
 
 	// 生成
 	result = _dev->CreateDescriptorHeap(&descHeapDesc, IID_PPV_ARGS(&texDescHeap));
@@ -689,8 +678,8 @@ void Application::Execute()
 		return;
 	}
 
+	// 通常テクスチャービュー作成
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-
 	srvDesc.Format = metadata.format; // RGBA (0.0F ~ 1.0Fに正規化)
 	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D; // 2Dテクスチャ

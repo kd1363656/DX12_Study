@@ -1,8 +1,6 @@
-Texture2D<float4> tex : register(t0); // 0番スロットに設定されたテクスチャ
-SamplerState smp : register(s0); // 0番スロットに設定されたサンプラー
-
-struct Output
+// 頂点シェーダー -> ピクセルシェーダーへのやり取りに使用する構造体
+struct BasicType
 {
     float4 svpos : SV_POSITION; // システム用頂点座標
-    float2 uv : TEXCORRD; // uv 値
+    float2 uv : TEXCORRD; // UV値
 };
