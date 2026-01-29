@@ -266,24 +266,24 @@ void Application::Execute()
 		heapProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
 		heapProp.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
 
-		D3D12_RESOURCE_DESC resDesc = {};
+		D3D12_RESOURCE_DESC resdesc = {};
 
-		resDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-		resDesc.Width = sizeof(vertices); // 頂点情報が入るだけのサイズ
-		resDesc.Height = 1;
-		resDesc.DepthOrArraySize = 1;
-		resDesc.MipLevels = 1;
-		resDesc.Format = DXGI_FORMAT_UNKNOWN;
-		resDesc.SampleDesc.Count = 1;
-		resDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-		resDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+		resdesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+		resdesc.Width = sizeof(vertices); // 頂点情報が入るだけのサイズ
+		resdesc.Height = 1;
+		resdesc.DepthOrArraySize = 1;
+		resdesc.MipLevels = 1;
+		resdesc.Format = DXGI_FORMAT_UNKNOWN;
+		resdesc.SampleDesc.Count = 1;
+		resdesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+		resdesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 
 		// UPLOAD ( CPU GPU どちらからもアクセス可能)
 		ComPtr<ID3D12Resource> vertBuff = nullptr;
 		result = _dev->CreateCommittedResource(
 			&heapProp, 
 			D3D12_HEAP_FLAG_NONE, 
-			&resDesc,
+			&resdesc,
 			D3D12_RESOURCE_STATE_GENERIC_READ, 
 			nullptr,
 			IID_PPV_ARGS(&vertBuff));
@@ -317,12 +317,12 @@ void Application::Execute()
 		ComPtr<ID3D12Resource> idxBuff = nullptr;
 
 		// 設定は、バッファーのサイズ以外、頂点バッファーの設定を使いまわしてよい
-		resDesc.Width = sizeof(indices);
+		resdesc.Width = sizeof(indices);
 
 		result = _dev->CreateCommittedResource(
 			&heapProp, 
 			D3D12_HEAP_FLAG_NONE,
-			&resDesc,
+			&resdesc,
 			D3D12_RESOURCE_STATE_GENERIC_READ,
 			nullptr,
 			IID_PPV_ARGS(&idxBuff));
@@ -414,11 +414,19 @@ void Application::Execute()
 
 		D3D12_INPUT_ELEMENT_DESC inputLayout[] =
 		{
+			// 座標
 			{
 				"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0,
 				D3D12_APPEND_ALIGNED_ELEMENT,
 				D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0
 			},
+
+			// UV (追加)
+			{
+				"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0,
+				D3D12_APPEND_ALIGNED_ELEMENT,
+				D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0
+			}
 		};
 
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC gpipeline = {};
@@ -538,6 +546,78 @@ void Application::Execute()
 		scissorrect.left = 0; // 切り抜き左座標
 		scissorrect.right = scissorrect.left + window_width; // 切り抜き右座標
 		scissorrect.bottom = scissorrect.top + window_height; // 切り抜き下座標
+
+		std::vector<TexRGBA> texturedata(256 * 256);
+
+		for (auto& rgba : texturedata)
+		{
+			rgba.R = rand() % 256;
+			rgba.G = rand() % 256;
+			rgba.B = rand() % 256;
+			rgba.A = 255; // αは1.0とする
+		}
+
+		// WriteToSubresource で転送するためのヒープ設定
+		D3D12_HEAP_PROPERTIES heapprop = {};
+
+		// 特殊な設定なので DEFAULT でも UPLOAD でもない
+		heapprop.Type = D3D12_HEAP_TYPE_CUSTOM;
+
+		// ライトバック
+		heapprop.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_WRITE_BACK;
+
+		// 転送は L0、つまり CPU 側から直接行う
+		heapprop.MemoryPoolPreference = D3D12_MEMORY_POOL_L0;
+
+		// 単一アダプターのため 0
+		heapprop.CreationNodeMask = 0;
+		heapprop.VisibleNodeMask  = 0;
+
+		D3D12_RESOURCE_DESC resDesc = {};
+
+		resDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;	// RGBA フォーマット
+		resDesc.Width = 256; // 幅 256 ピクセル
+		resDesc.Height = 256; // 高さ 
+		resDesc.DepthOrArraySize = 1; // 2D でも配列でもないので 1
+		resDesc.SampleDesc.Count = 1; // 通常テクスチャなのでアンチエイリアシングしない
+		resDesc.SampleDesc.Quality = 0; // クオリティは最低
+		resDesc.MipLevels = 1; // ミップマップしないのでミップ数は1つ
+		resDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D; // 2D テクスチャ用
+		resDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN; // レイアウトは決定しない
+		resDesc.Flags = D3D12_RESOURCE_FLAG_NONE;      // 特にフラグなし
+
+		ComPtr<ID3D12Resource> texbuff = nullptr;
+
+		result = _dev->CreateCommittedResource(
+			&heapprop,
+			D3D12_HEAP_FLAG_NONE,
+			&resDesc,
+			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, // テクスチャ用指定
+			nullptr,
+			IID_PPV_ARGS(&texbuff));
+
+		if (FAILED(result))
+		{
+			assert(false && "テクスチャバッファーの作成に失敗");
+			return;
+		}
+
+
+		result = texbuff->WriteToSubresource(
+			0,
+			nullptr, // 全領域へコピー
+			texturedata.data(), // 元データアドレス
+			sizeof(TexRGBA) * 256, // 1ラインサイズ
+			sizeof(TexRGBA) * texturedata.size() // 全サイズ
+		);
+
+		if (FAILED(result))
+		{
+			assert(false && "テクスチャバッファーの転送に失敗");
+			return;
+		}
+
+
 
 		MSG msg = {};
 		unsigned int frame = 0;

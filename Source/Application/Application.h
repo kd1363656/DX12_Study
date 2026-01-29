@@ -7,6 +7,11 @@ struct Vertex
 	DirectX::XMFLOAT2 uv;  // uvç¿ïW
 };
 
+struct TexRGBA
+{
+	unsigned char R, G, B, A;
+};
+
 class Application
 {
 public:

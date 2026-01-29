@@ -160,6 +160,7 @@
     <ClInclude Include="Source\PCH.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="Asset\Shader\Basic\BasicShaderHeader.hlsli" />
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>

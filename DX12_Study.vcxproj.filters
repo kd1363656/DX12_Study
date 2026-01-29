@@ -35,6 +35,9 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
+    <None Include="Asset\Shader\Basic\BasicShaderHeader.hlsli">
+      <Filter>Asset\Shader\Basic</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Asset\Shader\Basic\BasicVertexShader.hlsl">
