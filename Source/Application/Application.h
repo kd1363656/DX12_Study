@@ -30,6 +30,8 @@ public:
 	void EnableDebugLayer();
 
 private:
+	
+	size_t AlignmentedSize(size_t size, size_t alignment);
 
 	Application () = default;
 	~Application() = default;
