@@ -486,8 +486,38 @@ void Application::Execute()
 
 		ComPtr<ID3D12RootSignature> rootsignature = nullptr;
 		D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
-
 		rootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+
+		D3D12_DESCRIPTOR_RANGE descTblRange = {};
+
+		descTblRange.NumDescriptors = 1; // テクスチャ1つ
+		descTblRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV, // 種別はテクスチャ
+		descTblRange.BaseShaderRegister = 0; // 0番スロットから
+		descTblRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+		D3D12_ROOT_PARAMETER rootparam = {};
+		rootparam.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		rootparam.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL; // ピクセルシェーダーから見える
+		rootparam.DescriptorTable.pDescriptorRanges = &descTblRange; // ディスクリプタレンジのアドレス
+		rootparam.DescriptorTable.NumDescriptorRanges = 1;
+
+		rootSignatureDesc.pParameters = &rootparam; // ルートパラメータの先頭アドレス
+		rootSignatureDesc.NumParameters = 1;        // ルートパラメータ数
+
+		D3D12_STATIC_SAMPLER_DESC samplerDesc = {};
+
+		samplerDesc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP; // 横方向の繰り返し
+		samplerDesc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP; // 縦方向の繰り返し
+		samplerDesc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP; // 奥行きの繰り返し
+		samplerDesc.BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK; // ボーダーは黒
+		samplerDesc.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR; // 線形補完
+		samplerDesc.MaxLOD = D3D12_FLOAT32_MAX; // ミップマップ最大値
+		samplerDesc.MinLOD = 0.0F; // ミップマップ最小値
+		samplerDesc.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL; // ピクセルシェーダーから見える
+		samplerDesc.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER; // リサンプリングしない
+
+		rootSignatureDesc.pStaticSamplers = &samplerDesc;
+		rootSignatureDesc.NumStaticSamplers = 1;
 
 		ComPtr<ID3DBlob> rootSigBlob = nullptr;
 		result = D3D12SerializeRootSignature(
