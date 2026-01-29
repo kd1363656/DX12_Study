@@ -805,15 +805,38 @@ void Application::Execute()
 	//	return;
 	//}
 
-	ComPtr<ID3D12DescriptorHeap> texDescHeap = nullptr;
+	auto cd3cx12HeapProperties     = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+	auto cd3dx12ResourceDescBuffer = CD3DX12_RESOURCE_DESC::Buffer((sizeof(matrix) + 0xff) & ~0xff);
+
+	ComPtr<ID3D12Resource> constBuff = nullptr;
+	result = _dev->CreateCommittedResource(
+		&cd3cx12HeapProperties,
+		D3D12_HEAP_FLAG_NONE,
+		&cd3dx12ResourceDescBuffer,
+		D3D12_RESOURCE_STATE_GENERIC_READ,
+		nullptr,
+		IID_PPV_ARGS(&constBuff)
+	);
+
+	DirectX::XMMATRIX* mapMatrix = nullptr; // マップ先を示すポインタ
+	result = constBuff->Map(0, nullptr, (void**)&mapMatrix); // マップ
+	*mapMatrix = matrix;
+
+	if (FAILED(result))
+	{
+		assert(false && "コンスタントバッファの作成に失敗");
+		return;
+	}
+
+	ComPtr<ID3D12DescriptorHeap> basicDescHeap = nullptr;
 	D3D12_DESCRIPTOR_HEAP_DESC descHeapDesc = {};
 	descHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE; // シェーダーから見えるように
 	descHeapDesc.NodeMask = 0; // マスクは 0
-	descHeapDesc.NumDescriptors = 1; // ビューは今のところ一つだけ  
+	descHeapDesc.NumDescriptors = 2; // ビューは今のところ一つだけ  
 	descHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV; // シェーダーリソースビュー用
 
 	// 生成
-	result = _dev->CreateDescriptorHeap(&descHeapDesc, IID_PPV_ARGS(&texDescHeap));
+	result = _dev->CreateDescriptorHeap(&descHeapDesc, IID_PPV_ARGS(&basicDescHeap));
 
 	if (FAILED(result))
 	{
@@ -831,7 +854,7 @@ void Application::Execute()
 	_dev->CreateShaderResourceView(
 		texbuff.Get(), // ビューと関連付けるバッファー
 		&srvDesc,      // 先ほど設定したテクスチャ設定情報
-		texDescHeap->GetCPUDescriptorHandleForHeapStart() // ヒープのどこに割り当てるか
+		basicDescHeap->GetCPUDescriptorHandleForHeapStart() // ヒープのどこに割り当てるか
 	);
 
 	if (FAILED(result))
@@ -839,6 +862,8 @@ void Application::Execute()
 		assert(false && "テクスチャ用シェーダーリソースビューの作製に失敗");
 		return;
 	}
+
+	DirectX::XMMATRIX matrix = DirectX::XMMatrixIdentity();
 
 	MSG msg = {};
 	unsigned int frame = 0;
@@ -890,8 +915,8 @@ void Application::Execute()
 		_cmdList->IASetVertexBuffers(0, 1, &vbView);
 		_cmdList->IASetIndexBuffer(&ibView);
 
-		_cmdList->SetDescriptorHeaps(1, texDescHeap.GetAddressOf());
-		_cmdList->SetGraphicsRootDescriptorTable(0, texDescHeap->GetGPUDescriptorHandleForHeapStart());
+		_cmdList->SetDescriptorHeaps(1, basicDescHeap.GetAddressOf());
+		_cmdList->SetGraphicsRootDescriptorTable(0, basicDescHeap->GetGPUDescriptorHandleForHeapStart());
 
 		_cmdList->DrawIndexedInstanced(6, 1, 0, 0, 0);
 
