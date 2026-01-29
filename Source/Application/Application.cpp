@@ -485,7 +485,6 @@ void Application::Execute()
 		gpipeline.SampleDesc.Quality = 0; // クオリティは最低
 
 		ComPtr<ID3D12RootSignature> rootsignature = nullptr;
-
 		D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
 
 		rootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
@@ -617,7 +616,48 @@ void Application::Execute()
 			return;
 		}
 
+		ComPtr<ID3D12DescriptorHeap> texDescHeap = nullptr;
+		D3D12_DESCRIPTOR_HEAP_DESC descHeapDesc = {};
 
+		// シェーダーから見えるように
+		descHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+
+		// マスクは 0
+		descHeapDesc.NodeMask = 0;
+
+		// ビューは今のところ一つだけ
+		descHeapDesc.NumDescriptors = 1;
+
+		// シェーダーリソースビュー用
+		descHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+
+		// 生成
+		result = _dev->CreateDescriptorHeap(&descHeapDesc, IID_PPV_ARGS(&texDescHeap));
+
+		if (FAILED(result))
+		{
+			assert(false && "テクスチャ用ディスクリプタヒープの作製に失敗");
+			return;
+		}
+
+		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+
+		srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM; // RGBA (0.0F ~ 1.0Fに正規化)
+		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D; // 2Dテクスチャ
+		srvDesc.Texture2D.MipLevels = 1; // ミップマップは使用しないので 1
+
+		_dev->CreateShaderResourceView(
+			texbuff.Get(), // ビューと関連付けるバッファー
+			&srvDesc,      // 先ほど設定したテクスチャ設定情報
+			texDescHeap->GetCPUDescriptorHandleForHeapStart() // ヒープのどこに割り当てるか
+		);
+
+		if (FAILED(result))
+		{
+			assert(false && "テクスチャ用シェーダーリソースビューの作製に失敗");
+			return;
+		}
 
 		MSG msg = {};
 		unsigned int frame = 0;
